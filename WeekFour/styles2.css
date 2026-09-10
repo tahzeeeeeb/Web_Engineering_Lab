@@ -1,0 +1,60 @@
+* {
+    box-sizing: border-box;
+}
+
+body{
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    margin: 0;
+    padding: 1rem;
+}
+
+img, input, textarea, select {
+    max-width: 100%;
+}
+
+.header{
+    margin-bottom: 1rem;
+}
+
+.nav{
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.card{
+    background: #eee;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.skills{
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-left: 1rem;
+}
+
+.field{
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 1rem;
+}
+
+.field input,
+.field textarea{
+    width: 100%;
+}
+
+/* small screens and up: nav becomes a row, skills sit side by side */
+@media (min-width: 640px) {
+    .nav{
+        flex-direction: row;
+        gap: 1rem;
+    }
+
+    .skills{
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+}

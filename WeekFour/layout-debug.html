@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Layout Debug</title>
+    <link rel="stylesheet" href="layout-debug.css">
+</head>
+<body>
+    <h1>Layout Debug</h1>
+
+    <h2>Bug 1: Flex items overflow (no flex-wrap)</h2>
+
+    <h3>Broken</h3>
+    <div class="panel">
+        <div class="row broken-flex">
+            <div class="box">1</div>
+            <div class="box">2</div>
+            <div class="box">3</div>
+            <div class="box">4</div>
+            <div class="box">5</div>
+            <div class="box">6</div>
+            <div class="box">7</div>
+            <div class="box">8</div>
+        </div>
+    </div>
+
+    <h3>Fixed</h3>
+    <div class="panel">
+        <div class="row fixed-flex">
+            <div class="box">1</div>
+            <div class="box">2</div>
+            <div class="box">3</div>
+            <div class="box">4</div>
+            <div class="box">5</div>
+            <div class="box">6</div>
+            <div class="box">7</div>
+            <div class="box">8</div>
+        </div>
+    </div>
+
+    <h2>Bug 2: Absolute badge without a relative parent</h2>
+
+    <h3>Broken</h3>
+    <div class="card broken-badge">
+        Card content
+        <span class="badge">New</span>
+    </div>
+
+    <h3>Fixed</h3>
+    <div class="card fixed-badge">
+        Card content
+        <span class="badge">New</span>
+    </div>
+
+</body>
+</html>

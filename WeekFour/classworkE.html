@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+</head>
+<title>CSS Position</title>
+<link rel="stylesheet" href="stylesE.css">
+<body>
+    <h1>CSS Position</h1>
+
+    <h2>1. Static</h2>
+    <div class="row">
+        <div class="box">1</div>
+        <div class="box">2</div>
+        <div class="box">3</div>
+    </div>
+
+    <h2>2. Relative</h2>
+    <div class="row">
+        <div class="box">1</div>
+        <div class="box relative">2</div>
+        <div class="box">3</div>
+    </div>
+
+    <h2>3. Absolute</h2>
+    <div class="frame">
+        <div class="box">1</div>
+        <div class="box absolute">2</div>
+    </div>
+
+    <h2>4. Fixed</h2>
+    <p>Scroll down. This box stays in the corner of the window.</p>
+    <div class="box fixed">Fixed</div>
+
+    <h2>5. Sticky</h2>
+    <div class="tall">
+        <div class="box sticky">Sticky</div>
+        <p>Keep scrolling...</p>
+        <p>The sticky box stays at the top until this grey area ends.</p>
+    </div>
+
+</body>
+</html>
