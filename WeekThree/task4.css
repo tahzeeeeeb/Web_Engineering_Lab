@@ -1,0 +1,20 @@
+/* 1. Tag */
+h1 { color: navy; font-size: 2rem; }
+
+/* 2. Class */
+.note { color: teal; font-weight: bold; }
+
+/* 3. ID */
+#alert { background: #fff3cd; padding: 8px; }
+
+/* 4. Attribute */
+input[type="email"] { border: 2px solid teal; padding: 8px; }
+
+/* 5. Hover */
+a:hover { color: crimson; text-decoration: underline; }
+
+/* 6. Odd items */
+li:nth-child(odd) { background: #e3f2fd; }
+
+/* 7. Even items */
+li:nth-child(even) { background: #fff3e0; }

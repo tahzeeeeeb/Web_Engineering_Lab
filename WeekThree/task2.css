@@ -1,0 +1,15 @@
+body {
+    background: #f4f1ea;
+    font-family: Georgia, serif;
+}
+
+h1 {
+    color: navy;
+    font-size: 2rem;
+}
+
+p {
+    color: #333;
+    font-size: 1.125rem;
+    line-height: 1.6;
+}

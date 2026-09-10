@@ -1,0 +1,11 @@
+/* 1) Element selector: 0,0,1 */
+p { color: green; }
+
+/* 2) Class selector: 0,1,0 -> beats p */
+.intro { color: blue; }
+
+/* 3) Element + class: 0,1,1 -> beats .intro */
+p.intro { color: purple; }
+
+/* 4) ID + element: 1,0,1 -> beats everything above */
+#main p { color: navy; }

@@ -1,0 +1,17 @@
+body{
+    font-family: system-ui, "JetBrains monospace";
+    padding: 1rem;
+}
+
+.gallery{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.photo{
+    background: #4f2557f7;
+    padding: 2rem 1rem;
+    text-align: center;
+    flex: 1 1 160px;
+}
