@@ -299,7 +299,7 @@ function Throttle({ layout, voice, live }: ThrottleProps) {
         redline={layout.redline}
         max={Math.max(9000, Math.ceil((layout.redline + 1000) / 1000) * 1000)}
         label={`${layout.name} engine speed`}
-        note={base > IDLE ? 'set speed' : 'idle'}
+        note={base > IDLE ? 'Set speed' : 'Idle'}
       />
       <button
         type="button"
