@@ -373,7 +373,7 @@ export function HeroEngine() {
             }}
             redline={7000}
             label="Engine speed"
-            note={running ? `on screen ${SLOWER}× slower` : 'paused'}
+            note={running ? `Picture runs ${SLOWER}× slower` : 'Paused'}
           />
           <div className="dock-btns">
             <button type="button" className="btn btn--red" onClick={() => (open ? closeEngine() : openEngine())}>

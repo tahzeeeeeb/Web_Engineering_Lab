@@ -9,7 +9,7 @@ type Props = {
   min?: number
   step?: number
   label: string
-  /** Shown under the number, e.g. "50× slower on screen". */
+  /** Caption shown under the dial, e.g. "Picture runs 50× slower". */
   note?: string
   disabled?: boolean
 }
@@ -52,24 +52,47 @@ export function Tach({ value, onChange, redline, max = 9000, min = 0, step = 100
     return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`
   }
 
+  const chrome = `tach-chrome-${id.replace(/:/g, '')}`
+
+  // each rpm drawn once, styled by the largest step it falls on
   const ticks = []
-  for (let v = min; v <= max; v += 500) {
-    const major = v % 1000 === 0
-    const [x0, y0] = polar(toDeg(v), major ? R - 13 : R - 8)
+  const nums = []
+  for (let v = min; v <= max; v += 250) {
+    const level = v % 1000 === 0 ? 'major' : v % 500 === 0 ? 'mid' : 'minor'
+    const len = level === 'major' ? 11 : level === 'mid' ? 7 : 4
+    const [x0, y0] = polar(toDeg(v), R - len)
     const [x1, y1] = polar(toDeg(v), R)
     ticks.push(
-      <line key={v} x1={x0} y1={y0} x2={x1} y2={y1} className={`tach-tick${major ? ' is-major' : ''}${v >= redline ? ' is-red' : ''}`} />,
+      <line key={v} x1={x0} y1={y0} x2={x1} y2={y1} className={`tach-tick is-${level}${v >= redline ? ' is-red' : ''}`} />,
     )
-    if (major && v > min) {
-      const [tx, ty] = polar(toDeg(v), R - 25)
-      ticks.push(
-        <text key={`t${v}`} x={tx} y={ty} className={`tach-num${v >= redline ? ' is-red' : ''}`}>
+    if (level === 'major' && v > 0) {
+      const [tx, ty] = polar(toDeg(v), 62)
+      nums.push(
+        <text key={v} x={tx} y={ty} className={`tach-num${v >= redline ? ' is-red' : ''}`}>
           {v / 1000}
         </text>,
       )
     }
   }
+
+  // shift lights: three gold, three red, one white, lighting up over the last 1,750 rpm before the redline
+  const flash = value >= redline
+  const lights = Array.from({ length: 7 }, (_, i) => {
+    const tone = i < 3 ? 'gold' : i < 6 ? 'red' : 'ink'
+    const on = value >= redline - 1750 + 250 * i
+    return (
+      <circle
+        key={i}
+        cx={77.5 + 7.5 * i}
+        cy={114}
+        r={2.2}
+        className={`tach-led tach-led--${tone}${on ? ' is-on' : ''}${flash ? ' is-flash' : ''}`}
+      />
+    )
+  })
+
   const needle = toDeg(value)
+  const tip = C + R - 10
 
   return (
     <div className={`tach${disabled ? ' is-off' : ''}`}>
@@ -87,26 +110,43 @@ export function Tach({ value, onChange, redline, max = 9000, min = 0, step = 100
         onPointerUp={() => (dragging.current = false)}
         onPointerCancel={() => (dragging.current = false)}
       >
-        <circle cx={C} cy={C} r={R + 10} className="tach-bezel" />
-        <circle cx={C} cy={C} r={R + 4} className="tach-face" />
-        <path d={arc(redline, max, R - 4)} className="tach-red" />
+        <defs>
+          <linearGradient id={chrome} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" className="chrome-a" />
+            <stop offset=".5" className="chrome-b" />
+            <stop offset="1" className="chrome-c" />
+          </linearGradient>
+        </defs>
+        <circle cx={C} cy={C} r={94} className="tach-bezel" fill={`url(#${chrome})`} />
+        <circle cx={C} cy={C} r={88} className="tach-face" />
+        <circle cx={C} cy={C} r={86} className="tach-hair" />
+        <path d={arc(redline, max, R + 1.5)} className="tach-red" />
         {ticks}
-        <text x={C} y={C - 30} className="tach-unit">
+        {nums}
+        <text x={C} y={64} className="tach-kanji" lang="ja">
+          回転計
+        </text>
+        <text x={C} y={76} className="tach-unit">
           ×1000 r/min
         </text>
-        <g transform={`rotate(${needle} ${C} ${C})`} className="tach-needle">
-          <path d={`M${C - 16} ${C - 2.2} L${C + R - 6} ${C - 0.6} L${C + R - 6} ${C + 0.6} L${C - 16} ${C + 2.2} Z`} />
-        </g>
-        <circle cx={C} cy={C} r={8} className="tach-hub" />
-        <text x={C} y={C + 50} className="tach-read">
+        {lights}
+        <rect x={70} y={123} width={60} height={20} rx={3} className="tach-win" />
+        <text x={75} y={136.5} className="tach-rpm">
+          rpm
+        </text>
+        <text x={125} y={137.5} className="tach-val">
           {value.toLocaleString('en')}
         </text>
-        {note && (
-          <text x={C} y={C + 66} className="tach-note">
-            {note}
-          </text>
-        )}
+        <g transform={`rotate(${needle} ${C} ${C})`} className="tach-needle">
+          <polygon
+            points={`${C - 18},${C - 2.2} ${C},${C - 2.2} ${tip},${C - 0.5} ${tip},${C + 0.5} ${C},${C + 2.2} ${C - 18},${C + 2.2}`}
+          />
+          <circle cx={C - 13} cy={C} r={4.5} />
+        </g>
+        <circle cx={C} cy={C} r={7} className="tach-hub" />
+        <circle cx={C} cy={C} r={2.4} className="tach-hub-dot" />
       </svg>
+      {note && <p className="tach-cap">{note}</p>}
       <label className="vh" htmlFor={id}>
         {label}
       </label>

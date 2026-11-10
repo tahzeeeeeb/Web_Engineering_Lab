@@ -951,28 +951,31 @@ body:has(.ka) {
 .tach svg:active {
   cursor: grabbing;
 }
-.tach-bezel {
-  fill: var(--panel-2);
-  stroke: var(--line-2);
-  stroke-width: 1.2;
-}
+/* the bezel's fill is the chrome gradient set on the element (chrome-a/b/c stops) */
 .tach-face {
   fill: var(--bg-2);
+}
+.tach-hair {
+  fill: none;
   stroke: var(--line);
+  stroke-width: 1;
 }
 .tach-red {
   fill: none;
   stroke: var(--red-hi);
-  stroke-width: 7;
-  opacity: 0.85;
-}
-.tach-tick {
-  stroke: var(--ink-2);
-  stroke-width: 1.2;
+  stroke-width: 4;
 }
 .tach-tick.is-major {
   stroke: var(--ink);
-  stroke-width: 2.4;
+  stroke-width: 2.2;
+}
+.tach-tick.is-mid {
+  stroke: var(--ink-2);
+  stroke-width: 1.2;
+}
+.tach-tick.is-minor {
+  stroke: var(--muted);
+  stroke-width: 0.8;
 }
 .tach-tick.is-red {
   stroke: var(--red-text);
@@ -980,54 +983,105 @@ body:has(.ka) {
 .tach-num {
   fill: var(--ink);
   font-family: var(--f-race);
-  font-style: italic;
-  font-weight: 800;
-  font-size: 15px;
+  font-weight: 600;
+  font-size: 13px;
+  font-stretch: 75%;
   text-anchor: middle;
   dominant-baseline: central;
+  font-variant-numeric: tabular-nums;
 }
 .tach-num.is-red {
   fill: var(--red-text);
 }
+.tach-kanji {
+  fill: var(--red-text);
+  font-family: var(--f-min);
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-anchor: middle;
+}
 .tach-unit {
   fill: var(--muted);
   font-family: var(--f-race);
+  font-weight: 600;
   font-size: 7.5px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.04em;
   text-anchor: middle;
-  text-transform: uppercase;
+}
+.tach-led {
+  fill: var(--line-2);
+}
+.tach-led--gold.is-on {
+  fill: var(--gold);
+}
+.tach-led--red.is-on {
+  fill: var(--red-hi);
+}
+.tach-led--ink.is-on {
+  fill: var(--ink);
+}
+.tach-led.is-flash {
+  animation: tach-flash 0.5s steps(1) infinite;
+}
+@keyframes tach-flash {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tach-led.is-flash {
+    animation: none;
+  }
+}
+.tach-win {
+  fill: var(--bg);
+  stroke: var(--line-2);
+  stroke-width: 1;
+}
+.tach-rpm {
+  fill: var(--muted);
+  font-family: var(--f-race);
+  font-weight: 600;
+  font-size: 7px;
+  text-anchor: start;
+}
+.tach-val {
+  fill: var(--ink);
+  font-family: var(--f-race);
+  font-weight: 600;
+  font-size: 13px;
+  font-stretch: 85%;
+  font-variant-numeric: tabular-nums;
+  text-anchor: end;
 }
 .tach-needle {
   transition: transform 0.12s linear;
 }
-.tach-needle path {
+.tach-needle > * {
   fill: var(--red-hi);
   stroke: var(--bg);
   stroke-width: 0.6;
 }
 .tach-hub {
-  fill: var(--ink);
-  stroke: var(--bg);
-  stroke-width: 2;
+  fill: var(--panel-2);
+  stroke: var(--line-2);
+  stroke-width: 1.5;
 }
-.tach-read {
+.tach-hub-dot {
   fill: var(--ink);
-  font-family: var(--f-race);
-  font-style: italic;
-  font-weight: 800;
-  font-size: 22px;
-  text-anchor: middle;
-  font-variant-numeric: tabular-nums;
 }
-.tach-note {
-  fill: var(--muted);
-  font-family: var(--f-race);
-  font-size: 8.5px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-anchor: middle;
-  text-transform: uppercase;
+.tach-cap {
+  margin: 6px 0 0;
+  max-width: 100%;
+  color: var(--muted);
+  font-family: var(--f-body);
+  font-size: 11.5px;
+  line-height: 1.3;
+  text-align: center;
 }
 .tach-input {
   position: absolute;
