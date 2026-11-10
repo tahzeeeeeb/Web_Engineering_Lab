@@ -252,6 +252,7 @@ body:has(.ka) {
 /* ---------- shared pieces ---------- */
 
 .chrome,
+.sliced-base,
 .sliced-half,
 .brand-word,
 .sh-num,
@@ -1577,77 +1578,97 @@ body:has(.ka) {
   line-height: 1;
   white-space: nowrap;
 }
+/* At rest the base is the visible chrome word. During a cut (.is-cutting, added by Sliced.tsx)
+   it hides and two clipped copies take its place: they split along the blade and rejoin at zero offset. */
 .sliced-base {
-  color: transparent;
+  display: block; /* same 1em box as the halves, so the chrome gradient lines up exactly when they swap */
 }
 .sliced-half {
   position: absolute;
   inset: 0;
   white-space: nowrap;
   pointer-events: none;
-  opacity: 0;
+  visibility: hidden;
 }
 .sliced-a {
   clip-path: polygon(-10% -20%, 110% -20%, 110% var(--yr), -10% var(--yl));
-  transform: translate(-0.35em, -0.06em);
 }
 .sliced-b {
   clip-path: polygon(-10% var(--yl), 110% var(--yr), 110% 120%, -10% 120%);
-  transform: translate(0.35em, 0.06em);
-}
-.sliced.is-cut .sliced-a {
-  animation: sliced-a 1s var(--sd) cubic-bezier(0.16, 0.84, 0.24, 1) forwards;
-}
-.sliced.is-cut .sliced-b {
-  animation: sliced-b 1s var(--sd) cubic-bezier(0.16, 0.84, 0.24, 1) forwards;
-}
-@keyframes sliced-a {
-  from {
-    opacity: 0;
-    transform: translate(-0.35em, -0.06em);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-0.012em, -0.008em);
-  }
-}
-@keyframes sliced-b {
-  from {
-    opacity: 0;
-    transform: translate(0.35em, 0.06em);
-  }
-  to {
-    opacity: 1;
-    transform: translate(0.012em, 0.008em);
-  }
 }
 .sliced-line {
   position: absolute;
   left: -6%;
   right: -6%;
-  top: 50%;
+  top: calc(var(--at) * 100%);
   height: 2px;
+  margin-top: -1px; /* centre the 2px edge on the cut line */
   background: linear-gradient(90deg, transparent, var(--blade-edge), var(--blade-core), var(--blade-edge), transparent);
   box-shadow: 0 0 10px var(--blade-glow);
   transform: rotate(var(--sa));
-  opacity: 0;
+  visibility: hidden;
   pointer-events: none;
 }
-.sliced.is-cut .sliced-line {
-  animation: sliced-line 0.9s calc(var(--sd) + 0.1s) var(--ease) both;
+.sliced.is-cutting .sliced-base {
+  visibility: hidden;
 }
-@keyframes sliced-line {
+.sliced.is-cutting .sliced-half,
+.sliced.is-cutting .sliced-line {
+  visibility: visible;
+}
+.sliced.is-cutting .sliced-half {
+  will-change: transform;
+}
+.sliced.is-cutting .sliced-line {
+  animation: sliced-blade 600ms var(--sd) cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.sliced.is-cutting .sliced-a {
+  animation: sliced-split-a 900ms var(--sd) both;
+}
+.sliced.is-cutting .sliced-b {
+  animation: sliced-split-b 900ms var(--sd) both;
+}
+@keyframes sliced-blade {
   0% {
-    opacity: 1;
     clip-path: inset(0 100% 0 0);
-  }
-  35% {
     opacity: 1;
+  }
+  40% {
     clip-path: inset(0 0 0 0);
+    opacity: 1;
   }
   100% {
-    opacity: 0;
     clip-path: inset(0 0 0 0);
+    opacity: 0;
+  }
+}
+/* whole while the blade crosses (0–22%), split (to 46%), then rejoin to exactly zero */
+@keyframes sliced-split-a {
+  0%,
+  22% {
+    transform: translate(0, 0);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  46% {
+    transform: translate(-0.07em, -0.035em);
+    animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+@keyframes sliced-split-b {
+  0%,
+  22% {
+    transform: translate(0, 0);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  46% {
+    transform: translate(0.07em, 0.035em);
+    animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  100% {
+    transform: translate(0, 0);
   }
 }
 
@@ -3244,15 +3265,6 @@ body:has(.ka) {
     animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
-  }
-  .sliced-half {
-    opacity: 1;
-  }
-  .sliced-a {
-    transform: translate(-0.012em, -0.008em);
-  }
-  .sliced-b {
-    transform: translate(0.012em, 0.008em);
   }
   .enso-draw {
     stroke-dashoffset: 0;
