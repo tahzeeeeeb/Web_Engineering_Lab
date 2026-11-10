@@ -79,20 +79,21 @@ function boxer(pairTdc: number[]): CylSpec[] {
   })
 }
 
-/** W engines: two narrow-angle VR banks on one crank, four staggered rows. */
-function wEngine(rowAngles: number[], perRow: number): CylSpec[] {
-  const n = rowAngles.length * perRow
-  const pitch = 1.08
-  const offsets = [-0.39, -0.13, 0.13, 0.39]
+/** W engines: two narrow-angle VR banks on one crank. Each bank has two rows 15° apart,
+    and its cylinders zig-zag between them. Each throw carries one cylinder from each bank. */
+function wEngine(bankAngle: number, perBank: number): CylSpec[] {
+  const n = perBank * 2
+  const pitch = 0.58
   const out: CylSpec[] = []
-  let j = 0
-  for (let i = 0; i < perRow; i++) {
-    const x = (i - (perRow - 1) / 2) * pitch
-    rowAngles.forEach((angle, k) => {
-      const tdc = (j % (n / 2)) * (720 / n)
-      out.push({ x: x + offsets[k], angle, pin: angle - tdc, t: i })
-      j++
-    })
+  for (let j = 0; j < perBank; j++) {
+    const x = (j - (perBank - 1) / 2) * pitch
+    const outer = j % 2 === 0
+    for (const side of [-1, 1]) {
+      const angle = side * (bankAngle / 2 + (outer ? 7.5 : -7.5))
+      const k = 2 * j + (side === 1 ? 1 : 0)
+      const tdc = (k % (n / 2)) * (720 / n)
+      out.push({ x: x + side * 0.07, angle, pin: angle - tdc, t: j })
+    }
   }
   return out
 }
@@ -269,12 +270,12 @@ export const LAYOUTS: Layout[] = [
     jp: 'W型12気筒',
     summary:
       'Two narrow VR6 engines joined on one crankshaft. Twelve cylinders in a block not much longer than a V6.',
-    how: 'Each bank is a VR6 with its cylinders staggered 15° apart; the two banks sit 72° apart. Seen from the front, the four rows make a W.',
+    how: 'Each bank is a VR6: two rows of cylinders 15° apart that zig-zag under one shared head. The two banks sit 72° apart, so from the front the four rows make a W.',
     pros: ['Twelve cylinders in a very short package', 'Smooth and quiet'],
     cons: ['Complicated to build and service', 'Heavy and wide'],
     cars: ['Bentley Continental GT (until 2024)', 'Volkswagen Phaeton W12', 'Audi A8 W12'],
     redline: 6200,
-    geometry: { kind: 'piston', cyls: wEngine([-43.5, -28.5, 28.5, 43.5], 3), bore: 0.78 },
+    geometry: { kind: 'piston', cyls: wEngine(72, 6), bore: 0.78 },
   },
   {
     id: 'w16',
@@ -283,12 +284,12 @@ export const LAYOUTS: Layout[] = [
     jp: 'W型16気筒',
     summary:
       'Two narrow-angle V8 banks on one crank: four rows of four cylinders. Built for one job, more than 1,000 horsepower in a road car.',
-    how: 'Each bank is a VR8 with rows 15° apart, and the banks sit 90° apart. Bugatti’s version displaces 8.0 litres with four turbochargers.',
+    how: 'Each bank is a VR8: two rows 15° apart under one head, with the banks 90° apart. Bugatti’s version displaces 8.0 litres with four turbochargers.',
     pros: ['Enormous power from a package that fits behind two seats', 'Smooth at any speed'],
     cons: ['Extremely complex and costly', 'Needs vast cooling: the Veyron carries ten radiators'],
     cars: ['Bugatti Veyron (1,001 PS)', 'Bugatti Chiron'],
     redline: 6700,
-    geometry: { kind: 'piston', cyls: wEngine([-52.5, -37.5, 37.5, 52.5], 4), bore: 0.74 },
+    geometry: { kind: 'piston', cyls: wEngine(90, 8), bore: 0.74 },
   },
   {
     id: 'flat4',

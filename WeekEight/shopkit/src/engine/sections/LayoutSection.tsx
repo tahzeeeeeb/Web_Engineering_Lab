@@ -109,7 +109,10 @@ export function LayoutSection() {
     const vHalf = (stage.camera.fov * Math.PI) / 360
     const hHalf = Math.atan(Math.tan(vHalf) * stage.camera.aspect)
     const dist = (size / 2 / Math.tan(Math.min(vHalf, hHalf))) * 1.05
-    const dir = stage.camera.position.clone().sub(stage.controls.target).normalize()
+    const dir =
+      layout.family === 'W'
+        ? new THREE.Vector3(-1, 0.42, 0.3).normalize()
+        : stage.camera.position.clone().sub(stage.controls.target).normalize()
     stage.controls.target.copy(center)
     stage.camera.position.copy(center).addScaledVector(dir, Math.max(4.5, dist))
     voiceRef.current?.setPattern(rig.fire)

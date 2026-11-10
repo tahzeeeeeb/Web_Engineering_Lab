@@ -59,16 +59,22 @@ function pistons(cyls: CylSpec[], boreScale: number, mats: Materials, crankcase?
   const web = extrude(webShape(r, 0.2, 0.42), 0.07, SHAPE_ZY_TO_X, 20)
   throws.forEach((list) => {
     const sorted = [...list].sort((a, b) => a.x - b.x)
-    const x0 = sorted[0].x - 0.15
-    const x1 = sorted[sorted.length - 1].x + 0.15
+    let x0 = sorted[0].x - 0.15
+    let x1 = sorted[sorted.length - 1].x + 0.15
     const shared = sorted.every((c) => c.pin === sorted[0].pin)
     if (shared) {
       const p = sorted[0].pin * D2R
       crankSpin.add(mesh(rod(0.15, x1 - x0, 28), mats.polished, [(x0 + x1) / 2, r * Math.cos(p), r * Math.sin(p)]))
     } else {
+      // split pins: as long as the closest neighbour allows, with the end webs flush on the outer pin ends
+      let gap = Infinity
+      for (let i = 1; i < sorted.length; i++) gap = Math.min(gap, sorted[i].x - sorted[i - 1].x)
+      const pinLen = sorted.length > 1 ? Math.min(0.27, gap - 0.02) : 0.27
+      x0 = sorted[0].x - pinLen / 2
+      x1 = sorted[sorted.length - 1].x + pinLen / 2
       sorted.forEach((c) => {
         const p = c.pin * D2R
-        crankSpin.add(mesh(rod(0.15, 0.27, 28), mats.polished, [c.x, r * Math.cos(p), r * Math.sin(p)]))
+        crankSpin.add(mesh(rod(0.15, pinLen, 28), mats.polished, [c.x, r * Math.cos(p), r * Math.sin(p)]))
       })
     }
     for (const [x, c] of [
@@ -142,25 +148,45 @@ function pistons(cyls: CylSpec[], boreScale: number, mats: Materials, crankcase?
   })
 
   // one head per bank (rows within 20° share a head, as on a VR engine)
-  const banks: { angle: number; xs: number[] }[] = []
+  const banks: { angle: number; xs: number[]; angles: number[] }[] = []
   cyls.forEach((c) => {
     const b = banks.find((k) => Math.abs(k.angle - c.angle) < 20)
     if (b) {
       b.xs.push(c.x)
+      b.angles.push(c.angle)
       b.angle = (b.angle * (b.xs.length - 1) + c.angle) / b.xs.length
-    } else banks.push({ angle: c.angle, xs: [c.x] })
+    } else banks.push({ angle: c.angle, xs: [c.x], angles: [c.angle] })
   })
   const coverMat = mats.crinkleRed.clone()
   coverMat.color.setHex(0x2a2a2d)
   banks.forEach((b) => {
     const g = new THREE.Group()
     g.rotation.x = b.angle * D2R
-    const x0 = Math.min(...b.xs) - pr - 0.12
-    const x1 = Math.max(...b.xs) + pr + 0.12
-    const spread = cyls.filter((c) => b.xs.includes(c.x)).some((c) => Math.abs(c.angle - b.angle) > 1) ? 0.42 : 0
-    const w = 2 * pr + 0.3 + spread
-    g.add(mesh(new THREE.BoxGeometry(x1 - x0, 0.32, w), mats.castAlu, [(x0 + x1) / 2, deck + 0.18, 0]))
-    g.add(mesh(new THREE.BoxGeometry(x1 - x0 - 0.06, 0.2, w - 0.12), coverMat, [(x0 + x1) / 2, deck + 0.44, 0]))
+    const lo = Math.min(...b.angles)
+    const hi = Math.max(...b.angles)
+    if (hi - lo > 1) {
+      // two rows (VR / W bank): the head's underside runs through both rows' deck rings
+      const delta = ((hi - lo) / 2) * D2R
+      const s = deck * Math.sin(delta)
+      const h0 = deck * Math.cos(delta)
+      const x0 = Math.min(...b.xs) - (pr + 0.1)
+      const x1 = Math.max(...b.xs) + (pr + 0.1)
+      const head = new THREE.Shape()
+      head.moveTo(-(s + pr + 0.1), h0)
+      head.lineTo(s + pr + 0.1, h0)
+      head.lineTo(s + pr - 0.02, h0 + 0.3)
+      head.lineTo(-(s + pr - 0.02), h0 + 0.3)
+      head.closePath()
+      g.add(mesh(extrude(head, x1 - x0, SHAPE_ZY_TO_X, 1), mats.castAlu, [(x0 + x1) / 2, 0, 0]))
+      g.add(mesh(new THREE.BoxGeometry(x1 - x0 - 0.1, 0.16, 2 * (s + pr - 0.1)), coverMat, [(x0 + x1) / 2, h0 + 0.38, 0]))
+    } else {
+      const x0 = Math.min(...b.xs) - pr - 0.12
+      const x1 = Math.max(...b.xs) + pr + 0.12
+      const spread = cyls.filter((c) => b.xs.includes(c.x)).some((c) => Math.abs(c.angle - b.angle) > 1) ? 0.42 : 0
+      const w = 2 * pr + 0.3 + spread
+      g.add(mesh(new THREE.BoxGeometry(x1 - x0, 0.32, w), mats.castAlu, [(x0 + x1) / 2, deck + 0.18, 0]))
+      g.add(mesh(new THREE.BoxGeometry(x1 - x0 - 0.06, 0.2, w - 0.12), coverMat, [(x0 + x1) / 2, deck + 0.44, 0]))
+    }
     root.add(g)
   })
 
