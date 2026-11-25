@@ -4,9 +4,13 @@
    pin    angle of its crankpin on the crank, degrees
    t      which crank throw it belongs to (cylinders on one throw share webs)
    fire   optional crank angle (0–720) of its power stroke; otherwise worked out from the TDC angles
-   A piston is at top dead centre when (crank angle + pin) equals its own angle. */
+   n      optional real cylinder number, as the manufacturer numbers it
+   A piston is at top dead centre when (crank angle + pin) equals its own angle.
 
-export type CylSpec = { x: number; angle: number; pin: number; t: number; fire?: number }
+   Conventions: x runs front (−) to back (+); the crank turns clockwise seen from the front, as real engines do;
+   a negative angle is the right-hand bank (in the direction of travel), a positive angle the left-hand bank. */
+
+export type CylSpec = { x: number; angle: number; pin: number; t: number; fire?: number; n?: number }
 
 export type LayoutGeometry =
   | { kind: 'piston'; cyls: CylSpec[]; bore: number; crankcase?: number }
@@ -27,6 +31,8 @@ export type Layout = {
   /** where the sound's blip tops out, rpm */
   redline: number
   geometry: LayoutGeometry
+  /** whose firing order and cylinder numbering the model uses */
+  numbering?: string
 }
 
 export const FAMILIES: Family[] = ['Inline', 'V', 'W', 'Boxer', 'Others']
@@ -35,81 +41,90 @@ export const FAMILIES: Family[] = ['Inline', 'V', 'W', 'Boxer', 'Others']
 
 const P = 0.86
 
-function inline(pins: number[], fire?: number[]): CylSpec[] {
-  return pins.map((pin, i) => ({ x: (i - (pins.length - 1) / 2) * P, angle: 0, pin, t: i, fire: fire?.[i] }))
-}
+type Slot = { n: number; x: number; angle: number; t: number }
 
-/** Single-row radial: every cylinder on one crankpin, firing every other cylinder. */
-function radial(n: number): CylSpec[] {
-  return Array.from({ length: n }, (_, k) => {
-    const angle = (k * 360) / n
-    return { x: 0, angle, pin: 0, t: 0, fire: angle + (k % 2 ? 360 : 0) }
+/**
+ * Every layout is built from a real engine's firing order. Each cylinder's power stroke is placed evenly
+ * through the 720° cycle in that order, and its crankpin is the one that order needs: the piston is at top
+ * dead centre when crank angle + pin = cylinder angle, so pin = angle − firing angle. Where two cylinders
+ * share a crankpin on the real engine, this gives them the same pin, which checks the order fits the crank.
+ */
+function build(slots: Slot[], order: number[]): CylSpec[] {
+  const gap = 720 / order.length
+  const at = new Map(order.map((n, k) => [n, k * gap]))
+  return slots.map(({ n, x, angle, t }) => {
+    const fire = at.get(n)
+    if (fire === undefined) throw new Error(`Cylinder ${n} is missing from the firing order ${order.join('-')}`)
+    return { n, x, angle, t, fire, pin: (((angle - fire) % 360) + 360) % 360 }
   })
 }
 
-/** Shared-pin V: each throw carries one cylinder from each bank. */
-function vee(bank: number, pins: number[]): CylSpec[] {
-  return pins.flatMap((pin, i) => {
-    const x = (i - (pins.length - 1) / 2) * P
-    return [
-      { x: x - 0.14, angle: -bank / 2, pin, t: i },
-      { x: x + 0.14, angle: bank / 2, pin, t: i },
-    ]
-  })
+/** Inline engine, cylinders numbered front to back. */
+function inline(order: number[]): CylSpec[] {
+  const k = order.length
+  return build(
+    Array.from({ length: k }, (_, i) => ({ n: i + 1, x: (i - (k - 1) / 2) * P, angle: 0, t: i })),
+    order,
+  )
 }
 
-/** Split-pin V: each cylinder gets its own pin, from its top-dead-centre angle. */
-function veeSplit(bank: number, tdcL: number[], tdcR: number[]): CylSpec[] {
-  return tdcL.flatMap((tl, i) => {
-    const x = (i - (tdcL.length - 1) / 2) * P
-    return [
-      { x: x - 0.14, angle: -bank / 2, pin: -bank / 2 - tl, t: i },
-      { x: x + 0.14, angle: bank / 2, pin: bank / 2 - tdcR[i], t: i },
-    ]
-  })
+/** Single-row radial: every cylinder on one crankpin, numbered clockwise from the top seen from the front. */
+function radial(k: number, order: number[]): CylSpec[] {
+  return build(
+    Array.from({ length: k }, (_, i) => ({ n: i + 1, x: 0, angle: (i * 360) / k, t: 0 })),
+    order,
+  )
 }
 
-function boxer(pairTdc: number[]): CylSpec[] {
-  return pairTdc.flatMap((t0, i) => {
-    const x = (i - (pairTdc.length - 1) / 2) * P
-    return [
-      { x: x - 0.17, angle: 90, pin: 90 - t0, t: i },
-      { x: x + 0.17, angle: -90, pin: -90 - t0, t: i },
-    ]
-  })
+/**
+ * Two banks, one throw per pair of cylinders (V and flat engines). `throws` lists the cylinder numbers on each
+ * throw, front to back, as [right bank, left bank]; `ahead` is the bank whose cylinder sits further forward.
+ * Shared or split crankpins follow from the firing order (see build).
+ */
+function vee(bank: number, throws: [number, number][], ahead: 'right' | 'left', order: number[], off = 0.14): CylSpec[] {
+  const d = ahead === 'right' ? off : -off
+  return build(
+    throws.flatMap(([right, left], i) => {
+      const x = (i - (throws.length - 1) / 2) * P
+      return [
+        { n: right, x: x - d, angle: -bank / 2, t: i },
+        { n: left, x: x + d, angle: bank / 2, t: i },
+      ]
+    }),
+    order,
+  )
 }
 
-/** W engines: two narrow-angle VR banks on one crank. Each bank has two rows 15° apart,
-    and its cylinders zig-zag between them. Each throw carries one cylinder from each bank. */
-function wEngine(bankAngle: number, perBank: number): CylSpec[] {
-  const n = perBank * 2
+/** Throws [1, k+1], [2, k+2] … for engines numbered 1…k down one bank and k+1…2k down the other. */
+const banked = (k: number) => Array.from({ length: k }, (_, i) => [i + 1, k + i + 1] as [number, number])
+
+/**
+ * W engines (Volkswagen layout, SSP 248): two narrow-angle VR banks on one crank, the right bank numbered
+ * 1…k and the left k+1…2k, front to back. Each bank has two rows 15° apart and its cylinders zig-zag between
+ * them, starting in the outer row. Both banks are the same VR module, so the two cylinders on a throw sit in
+ * matching rows, exactly one bank angle apart: on the W12 that is what makes VW's +12° split pin.
+ */
+function wEngine(bankAngle: number, perBank: number, order: number[]): CylSpec[] {
   const pitch = 0.58
-  const out: CylSpec[] = []
+  const slots: Slot[] = []
   for (let j = 0; j < perBank; j++) {
     const x = (j - (perBank - 1) / 2) * pitch
-    const outer = j % 2 === 0
-    for (const side of [-1, 1]) {
-      const angle = side * (bankAngle / 2 + (outer ? 7.5 : -7.5))
-      const k = 2 * j + (side === 1 ? 1 : 0)
-      const tdc = (k % (n / 2)) * (720 / n)
-      out.push({ x: x + side * 0.07, angle, pin: angle - tdc, t: j })
-    }
+    const row = j % 2 === 0 ? -7.5 : 7.5
+    slots.push({ n: j + 1, x: x - 0.07, angle: -bankAngle / 2 + row, t: j })
+    slots.push({ n: perBank + j + 1, x: x + 0.07, angle: bankAngle / 2 + row, t: j })
   }
-  return out
+  return build(slots, order)
 }
 
-function vr6(): CylSpec[] {
-  // Firing order 1-5-3-6-2-4, one firing every 120°
-  const tdc = [0, 120, 240, 240, 120, 0]
-  return tdc.map((t, j) => {
-    const angle = j % 2 === 0 ? -7.5 : 7.5
-    return { x: (j - 2.5) * 0.52, angle, pin: angle - t, t: j }
-  })
+/** VR6: one 15° block, cylinders numbered front to back, zig-zagging between the two rows. */
+function vr6(order: number[]): CylSpec[] {
+  return build(
+    Array.from({ length: 6 }, (_, j) => ({ n: j + 1, x: (j - 2.5) * 0.52, angle: j % 2 === 0 ? -7.5 : 7.5, t: j })),
+    order,
+  )
 }
 
 /* ---------------- the layouts ---------------- */
-
-const I6_PINS = [0, 240, 120, 120, 240, 0]
 
 export const LAYOUTS: Layout[] = [
   {
@@ -124,7 +139,8 @@ export const LAYOUTS: Layout[] = [
     cons: ['A rocking couple that needs a balance shaft', 'Long gaps between power strokes at low revs'],
     cars: ['Toyota GR Yaris (G16E-GTS, 1.6 L turbo)', 'Ford Fiesta ST (1.5 EcoBoost)', 'BMW i8 (1.5 L, with hybrid drive)'],
     redline: 7000,
-    geometry: { kind: 'piston', cyls: inline([0, 120, 240], [0, 240, 480]), bore: 1 },
+    geometry: { kind: 'piston', cyls: inline([1, 2, 3]), bore: 1 },
+    numbering: 'Numbered front to back. Every inline-three fires 1-2-3, the G16E-GTS included.',
   },
   {
     id: 'i4',
@@ -141,7 +157,8 @@ export const LAYOUTS: Layout[] = [
     ],
     cars: ['Honda Civic Type R (K20C)', 'Mitsubishi Lancer Evolution (4G63T)', 'Toyota Celica GT-Four (3S-GTE)'],
     redline: 7500,
-    geometry: { kind: 'piston', cyls: inline([0, 180, 180, 0], [0, 540, 180, 360]), bore: 1 },
+    geometry: { kind: 'piston', cyls: inline([1, 3, 4, 2]), bore: 1 },
+    numbering: 'Numbered front to back, as on the Honda K20C.',
   },
   {
     id: 'i5',
@@ -155,7 +172,8 @@ export const LAYOUTS: Layout[] = [
     cons: ['A rocking couple that needs balancing', 'Long for a transverse engine bay'],
     cars: ['Audi Sport quattro (Group B rally)', 'Audi RS 3 and TT RS (2.5 TFSI)', 'Volvo 850 T-5R'],
     redline: 7000,
-    geometry: { kind: 'piston', cyls: inline([0, 216, 144, 72, 288], [0, 144, 576, 288, 432]), bore: 1 },
+    geometry: { kind: 'piston', cyls: inline([1, 2, 4, 5, 3]), bore: 1 },
+    numbering: 'Numbered front to back, as on Audi’s five-cylinders.',
   },
   {
     id: 'i6',
@@ -169,7 +187,8 @@ export const LAYOUTS: Layout[] = [
     cons: ['Long, so hard to fit in many engine bays', 'The long crankshaft can twist under load'],
     cars: ['Toyota Supra A80 (2JZ-GTE)', 'Nissan Skyline GT-R R32–R34 (RB26DETT)', 'BMW M3 / M4 (S58)'],
     redline: 7500,
-    geometry: { kind: 'piston', cyls: inline(I6_PINS, [0, 480, 240, 600, 120, 360]), bore: 1 },
+    geometry: { kind: 'piston', cyls: inline([1, 5, 3, 6, 2, 4]), bore: 1 },
+    numbering: 'Numbered front to back, as on the 2JZ, RB26 and S58.',
   },
   {
     id: 'v6',
@@ -183,7 +202,8 @@ export const LAYOUTS: Layout[] = [
     cons: ['Two heads and two sets of camshafts', 'Not as naturally balanced as an inline-six'],
     cars: ['Nissan GT-R R35 (VR38DETT)', 'Honda NSX (C30A)', 'Formula 1 since 2014 (1.6 L turbo-hybrid, 90°)'],
     redline: 7000,
-    geometry: { kind: 'piston', cyls: veeSplit(60, [120, 0, 240], [0, 240, 120]), bore: 1 },
+    geometry: { kind: 'piston', cyls: vee(60, [[1, 2], [3, 4], [5, 6]], 'right', [1, 2, 3, 4, 5, 6]), bore: 1 },
+    numbering: 'Nissan numbering (VQ and VR38DETT): odd cylinders on the right bank, even on the left, 1 at the front.',
   },
   {
     id: 'v8',
@@ -197,7 +217,12 @@ export const LAYOUTS: Layout[] = [
     cons: ['Heavy crank that is slow to rev', 'Uneven exhaust pulses per bank make tuning the exhaust harder'],
     cars: ['Chevrolet Corvette (LS / LT family)', 'Ford Mustang GT (Coyote)', 'Lexus LC 500 (2UR-GSE)'],
     redline: 6600,
-    geometry: { kind: 'piston', cyls: vee(90, [0, 90, 270, 180]), bore: 1 },
+    geometry: {
+      kind: 'piston',
+      cyls: vee(90, [[2, 1], [4, 3], [6, 5], [8, 7]], 'left', [1, 8, 7, 2, 6, 5, 4, 3]),
+      bore: 1,
+    },
+    numbering: 'GM numbering (LS and LT): odd cylinders on the left bank, even on the right, 1 at the front left.',
   },
   {
     id: 'v8flat',
@@ -211,7 +236,12 @@ export const LAYOUTS: Layout[] = [
     cons: ['Shakes like an inline-four, at twice crank speed', 'Less low-down refinement'],
     cars: ['Ferrari 458 Italia (F136)', 'McLaren 720S (M840T)', 'Chevrolet Corvette Z06 C8 (LT6)'],
     redline: 8500,
-    geometry: { kind: 'piston', cyls: vee(90, [0, 180, 180, 0]), bore: 1 },
+    geometry: {
+      kind: 'piston',
+      cyls: vee(90, [[1, 8], [2, 7], [3, 6], [4, 5]], 'right', [1, 8, 3, 6, 4, 5, 2, 7]),
+      bore: 1,
+    },
+    numbering: 'Ferrari 458 (F136) numbering: 1–4 down the right bank from the front, 5–8 back up the left.',
   },
   {
     id: 'v10',
@@ -229,7 +259,9 @@ export const LAYOUTS: Layout[] = [
       'Formula 1, 1995–2005: 3.0 L V10s past 19,000 rpm',
     ],
     redline: 9000,
-    geometry: { kind: 'piston', cyls: vee(72, [0, 144, 288, 72, 216]), bore: 0.94 },
+    geometry: { kind: 'piston', cyls: vee(72, banked(5), 'right', [1, 6, 5, 10, 2, 7, 3, 8, 4, 9]), bore: 0.94 },
+    numbering:
+      'The standard even-firing V10 order, with 1–5 on the right bank and 6–10 on the left. Toyota has not published the LFA’s own.',
   },
   {
     id: 'v12',
@@ -243,7 +275,8 @@ export const LAYOUTS: Layout[] = [
     cons: ['Long, heavy and expensive', 'Two heads, four camshafts, many parts'],
     cars: ['Lamborghini Aventador', 'Ferrari 812 Superfast', 'McLaren F1 (BMW S70/2)'],
     redline: 8500,
-    geometry: { kind: 'piston', cyls: vee(60, I6_PINS), bore: 0.88 },
+    geometry: { kind: 'piston', cyls: vee(60, banked(6), 'right', [1, 7, 5, 11, 3, 9, 6, 12, 2, 8, 4, 10]), bore: 0.88 },
+    numbering: 'BMW numbering, as on the McLaren F1’s V12: 1–6 on the right bank, 7–12 on the left, front to back.',
   },
   {
     id: 'v16',
@@ -252,16 +285,27 @@ export const LAYOUTS: Layout[] = [
     jp: 'V型16気筒',
     summary:
       'Two straight-eights on one crank. Sixteen cylinders fire every 45°, so the power strokes overlap so heavily that the torque is almost perfectly smooth.',
-    how: 'Shown at 90° with eight crankpins spaced 45° apart. Very long, which is why so few have ever been built.',
+    how: 'Shown as Cadillac’s 1938–40 Series 90 engine: banks 135° apart on eight crankpins, each shared by one cylinder from each bank, so all sixteen fire evenly. Very long, which is why so few have ever been built.',
     pros: ['Silky, continuous torque', 'Huge displacement from small cylinders', 'Rare and spectacular'],
     cons: ['Extremely long engine and crankshaft', 'Heavy, complex and costly'],
     cars: [
+      'Cadillac Series 90 (1938–40, 135°), the engine shown',
       'Bugatti Tourbillon (8.3 L, with hybrid drive)',
       'Cizeta-Moroder V16T',
       'BRM Type 15, a 1950s supercharged 1.5 L Grand Prix V16',
     ],
     redline: 7000,
-    geometry: { kind: 'piston', cyls: vee(90, [0, 135, 270, 45, 180, 315, 90, 225]), bore: 0.84 },
+    geometry: {
+      kind: 'piston',
+      cyls: vee(
+        135,
+        [[2, 1], [4, 3], [6, 5], [8, 7], [10, 9], [12, 11], [14, 13], [16, 15]],
+        'left',
+        [1, 4, 9, 12, 3, 16, 11, 8, 15, 14, 7, 6, 13, 2, 5, 10],
+      ),
+      bore: 0.84,
+    },
+    numbering: 'Cadillac numbering (1938–40): odd cylinders on the left bank, even on the right, 1 at the front.',
   },
   {
     id: 'w12',
@@ -270,12 +314,13 @@ export const LAYOUTS: Layout[] = [
     jp: 'W型12気筒',
     summary:
       'Two narrow VR6 engines joined on one crankshaft. Twelve cylinders in a block not much longer than a V6.',
-    how: 'Each bank is a VR6: two rows of cylinders 15° apart that zig-zag under one shared head. The two banks sit 72° apart, so from the front the four rows make a W.',
+    how: 'Each bank is a VR6: two rows of cylinders 15° apart that zig-zag under one shared head. The banks sit 72° apart, giving four rows: the W. Each crankpin is split by 12° so it still fires every 60°.',
     pros: ['Twelve cylinders in a very short package', 'Smooth and quiet'],
     cons: ['Complicated to build and service', 'Heavy and wide'],
     cars: ['Bentley Continental GT (until 2024)', 'Volkswagen Phaeton W12', 'Audi A8 W12'],
     redline: 6200,
-    geometry: { kind: 'piston', cyls: wEngine(72, 6), bore: 0.78 },
+    geometry: { kind: 'piston', cyls: wEngine(72, 6, [1, 12, 5, 8, 3, 10, 6, 7, 2, 11, 4, 9]), bore: 0.78 },
+    numbering: 'Volkswagen numbering: 1–6 on the right bank, 7–12 on the left, each zig-zagging front to back.',
   },
   {
     id: 'w16',
@@ -289,7 +334,12 @@ export const LAYOUTS: Layout[] = [
     cons: ['Extremely complex and costly', 'Needs vast cooling: the Veyron carries ten radiators'],
     cars: ['Bugatti Veyron (1,001 PS)', 'Bugatti Chiron'],
     redline: 6700,
-    geometry: { kind: 'piston', cyls: wEngine(90, 8), bore: 0.74 },
+    geometry: {
+      kind: 'piston',
+      cyls: wEngine(90, 8, [1, 14, 9, 4, 7, 12, 15, 6, 13, 8, 3, 16, 11, 2, 5, 10]),
+      bore: 0.74,
+    },
+    numbering: 'Bugatti’s firing order, numbered as on Volkswagen’s W12: 1–8 on the right bank, 9–16 on the left.',
   },
   {
     id: 'flat4',
@@ -303,7 +353,8 @@ export const LAYOUTS: Layout[] = [
     cons: ['Wide, which limits steering lock and packaging', 'Two heads and long intake and exhaust plumbing'],
     cars: ['Subaru Impreza WRX (EJ20)', 'Toyota GR86 / Subaru BRZ', 'Porsche 718 Cayman (4-cylinder)'],
     redline: 7000,
-    geometry: { kind: 'piston', cyls: boxer([0, 180]), bore: 1 },
+    geometry: { kind: 'piston', cyls: vee(180, [[1, 2], [3, 4]], 'right', [1, 3, 2, 4], 0.17), bore: 1 },
+    numbering: 'Subaru numbering (EJ20): 1 and 3 on the right bank, 2 and 4 on the left, 1 at the front.',
   },
   {
     id: 'flat6',
@@ -317,7 +368,8 @@ export const LAYOUTS: Layout[] = [
     cons: ['Wide', 'Two heads; expensive to build'],
     cars: ['Porsche 911 (every generation)', 'Porsche 718 Cayman GT4 (4.0 L)', 'Subaru Outback 3.6R (EZ36)'],
     redline: 9000,
-    geometry: { kind: 'piston', cyls: boxer([0, 120, 240]), bore: 1 },
+    geometry: { kind: 'piston', cyls: vee(180, banked(3), 'right', [1, 6, 2, 4, 3, 5], 0.17), bore: 1 },
+    numbering: 'Porsche numbering: 1–3 on one bank, 4–6 on the other, each cylinder opposite the one numbered three higher.',
   },
   {
     id: 'flat12',
@@ -331,7 +383,8 @@ export const LAYOUTS: Layout[] = [
     cons: ['Extremely wide', 'Long and complex'],
     cars: ['Ferrari Testarossa and 512 BB', 'Ferrari 312B and 312T, 1970s Formula 1', 'Porsche 917, Le Mans winner 1970 and 1971'],
     redline: 7000,
-    geometry: { kind: 'piston', cyls: vee(180, I6_PINS), bore: 0.9 },
+    geometry: { kind: 'piston', cyls: vee(180, banked(6), 'right', [1, 9, 5, 12, 3, 8, 6, 10, 2, 7, 4, 11]), bore: 0.9 },
+    numbering: 'Ferrari numbering (Testarossa): 1–6 on the right bank, 7–12 on the left.',
   },
   {
     id: 'vr6',
@@ -345,7 +398,8 @@ export const LAYOUTS: Layout[] = [
     cons: ['Uneven port lengths between the two rows', 'Not as smooth as a true inline-six'],
     cars: ['Volkswagen Golf R32', 'Volkswagen Corrado VR6', 'Volkswagen Passat VR6'],
     redline: 6500,
-    geometry: { kind: 'piston', cyls: vr6(), bore: 0.86 },
+    geometry: { kind: 'piston', cyls: vr6([1, 5, 3, 6, 2, 4]), bore: 0.86 },
+    numbering: 'Volkswagen numbering: front to back, zig-zagging between the two rows.',
   },
   {
     id: 'rotary',
@@ -377,6 +431,7 @@ export const LAYOUTS: Layout[] = [
       'Monaco-Trossi, a 1935 Grand Prix car with a 16-cylinder radial',
     ],
     redline: 2700,
-    geometry: { kind: 'piston', cyls: radial(9), bore: 0.72, crankcase: 0.72 },
+    geometry: { kind: 'piston', cyls: radial(9, [1, 3, 5, 7, 9, 2, 4, 6, 8]), bore: 0.72, crankcase: 0.72 },
+    numbering: 'Numbered clockwise from the top cylinder, seen from the front.',
   },
 ]
