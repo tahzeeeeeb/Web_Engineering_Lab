@@ -9,7 +9,7 @@ type Props = {
   min?: number
   step?: number
   label: string
-  /** Caption shown under the dial, e.g. "Picture runs 50× slower". */
+  /** Caption shown under the dial, e.g. "Real speed". */
   note?: string
   disabled?: boolean
 }
