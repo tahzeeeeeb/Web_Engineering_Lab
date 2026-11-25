@@ -28,7 +28,7 @@ Fonts load from Google Fonts, so the first load needs internet.
 
 - **陰 / 陽** in the header switches between dark (the default) and light, with a katana cut across the page.
 - **音** turns sound on and off. Browsers only allow audio after your first click or key press, so the engine note starts then.
-- In the hero, click a part or press Open the engine. Drag the tachometer needle to set the revs. The picture runs 50× slower, but the sound is at the real speed.
+- In the hero, click a part or press Open the engine. Drag the tachometer needle to set the revs. The picture and the sound both run at the real speed.
 - In the layouts section, hold the Hold to rev button to hear each engine's real firing order.
 
 ## Folders
