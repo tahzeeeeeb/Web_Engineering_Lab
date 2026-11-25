@@ -10,6 +10,7 @@ import type { PartId } from '../data/parts'
 import { PartPanel } from '../ui/PartPanel'
 import { Sliced } from '../ui/Sliced'
 import { Tach } from '../ui/Tach'
+import { SlowMo, slowFactor, useSlowFactor } from '../ui/SlowMo'
 import { Enso, Sparkle } from '../ui/Ornament'
 import { cutStage } from '../ui/cut'
 import { createEngineVoice } from '../audio/sound'
@@ -40,6 +41,7 @@ export function HeroEngine() {
   const [rpm, setRpm] = useState(1800)
   const [manual, setManual] = useState(0)
   const [touched, setTouched] = useState(false)
+  const slow = useSlowFactor()
 
   const live = useRef({
     selected: null as PartId | null,
@@ -114,8 +116,8 @@ export function HeroEngine() {
 
     stage.setFrame((dt) => {
       // crank
-      // real speed: the crank turns rpm/60 times a second
-      if (L.running) L.theta += dt * (L.rpm / 60) * Math.PI * 2
+      // rpm/60 turns a second, slowed by the slow-motion factor; integrated, so changing factor never jumps
+      if (L.running) L.theta += (dt * (L.rpm / 60) * Math.PI * 2) / slowFactor()
       rig.update(L.theta)
 
       // explode / close
@@ -373,7 +375,7 @@ export function HeroEngine() {
             }}
             redline={7000}
             label="Engine speed"
-            note={running ? 'Real speed' : 'Paused'}
+            note={!running ? 'Paused' : slow === 1 ? 'Real time' : `Picture ${slow}× slower`}
           />
           <div className="dock-btns">
             <button type="button" className="btn btn--red" onClick={() => (open ? closeEngine() : openEngine())}>
@@ -383,6 +385,7 @@ export function HeroEngine() {
             <button type="button" className="btn" onClick={togglePause} aria-pressed={!running}>
               {running ? 'Pause' : 'Run'}
             </button>
+            <SlowMo />
             {!running && (
               <label className="ctrl-range">
                 <span>Turn by hand</span>

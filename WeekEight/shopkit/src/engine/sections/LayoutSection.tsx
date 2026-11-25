@@ -9,6 +9,7 @@ import { buildLayout } from '../three/layoutRig'
 import type { FirePattern, LayoutRig } from '../three/layoutRig'
 import { SectionHead } from '../ui/SectionHead'
 import { Tach } from '../ui/Tach'
+import { SlowMo, slowFactor } from '../ui/SlowMo'
 import { cutStage } from '../ui/cut'
 import { reducedMotion } from '../ui/prefs'
 import { watchVisibility } from '../ui/visibility'
@@ -85,8 +86,8 @@ export function LayoutSection() {
     let theta = 0
     let lit: HTMLLIElement | undefined
     stage.setFrame((dt) => {
-      // real speed: the crank turns rpm/60 times a second
-      theta += dt * (live.current.rpm / 60) * Math.PI * 2
+      // rpm/60 turns a second, slowed by the slow-motion factor; integrated, so changing factor never jumps
+      theta += (dt * (live.current.rpm / 60) * Math.PI * 2) / slowFactor()
       const rig = rigRef.current
       if (!rig) return
       rig.update(theta)
@@ -339,28 +340,32 @@ function Throttle({ layout, voice, live }: ThrottleProps) {
         label={`${layout.name} engine speed`}
         note={base > IDLE ? 'Set speed' : 'Idle'}
       />
-      <button
-        type="button"
-        className="btn btn--red throttle-btn"
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId)
-          press()
-        }}
-        onPointerUp={release}
-        onPointerCancel={release}
-        onKeyDown={(e) => {
-          if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
-            e.preventDefault()
+      {/* stacked beside the tach, reusing the hero dock's button column, so it fits on narrow screens */}
+      <div className="dock-btns">
+        <SlowMo />
+        <button
+          type="button"
+          className="btn btn--red throttle-btn"
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId)
             press()
-          }
-        }}
-        onKeyUp={(e) => {
-          if (e.key === ' ' || e.key === 'Enter') release()
-        }}
-        onBlur={release}
-      >
-        Hold to rev
-      </button>
+          }}
+          onPointerUp={release}
+          onPointerCancel={release}
+          onKeyDown={(e) => {
+            if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
+              e.preventDefault()
+              press()
+            }
+          }}
+          onKeyUp={(e) => {
+            if (e.key === ' ' || e.key === 'Enter') release()
+          }}
+          onBlur={release}
+        >
+          Hold to rev
+        </button>
+      </div>
     </div>
   )
 }

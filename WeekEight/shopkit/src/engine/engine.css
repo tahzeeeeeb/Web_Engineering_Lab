@@ -2158,6 +2158,23 @@ body:has(.ka) {
   background: var(--ink);
   color: var(--bg);
 }
+/* compact variant: the slow-motion control in the hero dock and the layouts throttle */
+.toggle--sm {
+  margin-top: 0;
+  background: var(--glass);
+}
+.toggle--sm button {
+  padding: 6px 8px;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+}
+@media (max-width: 760px) {
+  .toggle--sm button {
+    padding: 5px 6px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+  }
+}
 .cam-stats {
   position: relative;
   display: grid;
