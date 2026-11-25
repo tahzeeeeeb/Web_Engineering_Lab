@@ -2466,7 +2466,8 @@ body:has(.ka) {
   font-size: 14px;
   animation: pop 0.4s var(--ease) both;
 }
-.fo-list li:first-child {
+/* the cylinder on its power stroke right now, lit from the frame loop in LayoutSection */
+.fo-list li.is-firing {
   background: var(--red);
   border-color: var(--red);
   color: #fff;
