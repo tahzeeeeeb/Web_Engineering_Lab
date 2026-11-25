@@ -16,15 +16,15 @@ import { createEngineVoice, playTick } from '../audio/sound'
 import type { EngineVoice } from '../audio/sound'
 
 const GROUND = -1.25
-const SLOW = 45 // the picture turns this many times slower than the sound
 const IDLE = 1100
+const R2D = 180 / Math.PI
 
-/** Firing order and spacing, read straight off the model's own firing angles. */
-function firing(fire: FirePattern, rotary: boolean) {
-  if (rotary) return { order: [] as number[], text: 'Each rotor fires once per turn of the shaft: with two rotors, every 180°.' }
+/** Firing order and spacing, read straight off the model's own firing angles. `labels` are the real cylinder numbers. */
+function firing(fire: FirePattern, labels: number[], rotary: boolean) {
+  if (rotary) return { order: [] as { cyl: number; n: number }[], text: 'Each rotor fires once per turn of the shaft: with two rotors, every 180°.' }
   const sorted = fire.angles.map((a, i) => ({ a, i })).sort((p, q) => p.a - q.a)
   // read the order starting from cylinder 1, as firing orders are always written
-  const start = sorted.findIndex((p) => p.i === 0)
+  const start = Math.max(0, sorted.findIndex((p) => labels[p.i] === 1))
   const idx = [...sorted.slice(start), ...sorted.slice(0, start)].map((p, k) => ({ ...p, a: k < sorted.length - start ? p.a : p.a + 720 }))
   const gaps = idx.map((p, k) => {
     const next = k === idx.length - 1 ? idx[0].a + 720 : idx[k + 1].a
@@ -32,9 +32,23 @@ function firing(fire: FirePattern, rotary: boolean) {
   })
   const even = gaps.every((g) => Math.abs(g - gaps[0]) <= 1)
   return {
-    order: idx.map((p) => p.i + 1),
+    order: idx.map((p) => ({ cyl: p.i, n: labels[p.i] })),
     text: even ? `A power stroke every ${gaps[0]}° of crank rotation.` : `Uneven: gaps of ${[...new Set(gaps)].join('°, ')}°.`,
   }
+}
+
+/** Index of the cylinder whose power stroke began most recently, at crank angle `deg` (0–720). */
+function firingNow(angles: number[], deg: number): number {
+  let best = -1
+  let since = Infinity
+  angles.forEach((a, i) => {
+    const d = (((deg - a) % 720) + 720) % 720
+    if (d < since) {
+      since = d
+      best = i
+    }
+  })
+  return best
 }
 
 export function LayoutSection() {
@@ -44,6 +58,8 @@ export function LayoutSection() {
   const rigRef = useRef<LayoutRig | null>(null)
   const voiceRef = useRef<EngineVoice | null>(null)
   const live = useRef({ rpm: IDLE })
+  // firing-order circles by cylinder index, lit straight from the frame loop so React doesn't re-render every frame
+  const circles = useRef(new Map<number, HTMLLIElement>())
   const [id, setId] = useState('v8')
   const [fire, setFire] = useState<FirePattern | null>(null)
   const layout = LAYOUTS.find((l) => l.id === id) ?? LAYOUTS[0]
@@ -67,9 +83,19 @@ export function LayoutSection() {
     const voice = createEngineVoice(1)
     voiceRef.current = voice
     let theta = 0
+    let lit: HTMLLIElement | undefined
     stage.setFrame((dt) => {
-      theta += dt * ((live.current.rpm / 60) * Math.PI * 2) / SLOW
-      rigRef.current?.update(theta)
+      // real speed: the crank turns rpm/60 times a second
+      theta += dt * (live.current.rpm / 60) * Math.PI * 2
+      const rig = rigRef.current
+      if (!rig) return
+      rig.update(theta)
+      const now = rig.cylinders > 0 ? circles.current.get(firingNow(rig.fire.angles, (theta * R2D) % 720)) : undefined
+      if (now !== lit) {
+        lit?.classList.remove('is-firing')
+        now?.classList.add('is-firing')
+        lit = now
+      }
     })
     const stop = () => (stage.controls.autoRotate = false)
     canvas.addEventListener('pointerdown', stop)
@@ -132,7 +158,12 @@ export function LayoutSection() {
     if (first) pick(first.id)
   }
 
-  const fo = useMemo(() => (fire ? firing(fire, layout.geometry.kind === 'rotary') : null), [fire, layout])
+  const fo = useMemo(() => {
+    if (!fire) return null
+    const g = layout.geometry
+    const labels = g.kind === 'piston' ? g.cyls.map((c, i) => c.n ?? i + 1) : []
+    return firing(fire, labels, g.kind === 'rotary')
+  }, [fire, layout])
 
   return (
     <section className="sec" aria-labelledby="layout-title" id="layouts">
@@ -190,16 +221,23 @@ export function LayoutSection() {
             <div className="fo">
               <h4>Firing order</h4>
               {fo.order.length > 0 && (
-                <ol className="fo-list" aria-label={`Firing order ${fo.order.join(', ')}`}>
-                  {fo.order.map((n, k) => (
-                    <li key={k} style={{ animationDelay: `${k * 40}ms` }}>
+                <ol className="fo-list" aria-label={`Firing order ${fo.order.map((c) => c.n).join(', ')}`}>
+                  {fo.order.map(({ cyl, n }, k) => (
+                    <li
+                      key={k}
+                      ref={(el) => {
+                        if (el) circles.current.set(cyl, el)
+                        else circles.current.delete(cyl)
+                      }}
+                      style={{ animationDelay: `${k * 40}ms` }}
+                    >
                       {n}
                     </li>
                   ))}
                 </ol>
               )}
               <p>{fo.text}</p>
-              {fo.order.length > 0 && <p className="fo-note">Cylinders numbered as modelled here, front to back.</p>}
+              {fo.order.length > 0 && layout.numbering && <p className="fo-note">{layout.numbering}</p>}
             </div>
           )}
           <div className="pc">
