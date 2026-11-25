@@ -18,7 +18,6 @@ import { playTick } from '../audio/sound'
 import { reducedMotion } from '../ui/prefs'
 import { watchVisibility } from '../ui/visibility'
 
-const SLOWER = 50
 const STROKE_EN = ['Power', 'Exhaust', 'Intake', 'Compress']
 const STROKE_JP = ['燃焼', '排気', '吸入', '圧縮']
 const CLOSED = { target: new THREE.Vector3(0, 1.05, 0), dist: 14.2 }
@@ -71,7 +70,7 @@ export function HeroEngine() {
     voiceRef.current?.setActive(running && inView)
   }, [running, rpm, inView])
 
-  /* ---------- engine note: real time, even though the picture runs 50× slower ---------- */
+  /* ---------- engine note: real time, like the picture ---------- */
   useEffect(() => {
     const voice = createEngineVoice(1)
     voiceRef.current = voice
@@ -115,7 +114,8 @@ export function HeroEngine() {
 
     stage.setFrame((dt) => {
       // crank
-      if (L.running) L.theta += dt * (L.rpm / 60 / SLOWER) * Math.PI * 2
+      // real speed: the crank turns rpm/60 times a second
+      if (L.running) L.theta += dt * (L.rpm / 60) * Math.PI * 2
       rig.update(L.theta)
 
       // explode / close
@@ -314,7 +314,7 @@ export function HeroEngine() {
         </h1>
         <div className="hero-side">
           <p className="hero-lead">
-            A working 2.0-litre four-cylinder, modelled part for part and turning fifty times slower than life. Click
+            A working 2.0-litre four-cylinder, modelled part for part and turning at its real speed. Click
             anything and the engine is cut open: first what that part is, then everything about it.
           </p>
           <p className="hero-spec">
@@ -373,7 +373,7 @@ export function HeroEngine() {
             }}
             redline={7000}
             label="Engine speed"
-            note={running ? `Picture runs ${SLOWER}× slower` : 'Paused'}
+            note={running ? 'Real speed' : 'Paused'}
           />
           <div className="dock-btns">
             <button type="button" className="btn btn--red" onClick={() => (open ? closeEngine() : openEngine())}>
